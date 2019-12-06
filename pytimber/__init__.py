@@ -18,12 +18,15 @@ from . import timberdata
 
 from .pagestore import PageStore
 
+from .nxcals import NXCals
+
 __version__ = "2.8.0"
 
 __cmmnbuild_deps__ = [
     "accsoft-cals-extr-client",
     "accsoft-cals-extr-domain",
-    "lhc-commons-cals-utils",
+#    "lhc-commons-cals-utils",
+    "pytimber-utils",
     "slf4j-log4j12",
     "slf4j-api",
     "log4j",
