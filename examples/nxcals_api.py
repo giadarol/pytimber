@@ -9,3 +9,13 @@ org=jpype.JPackage('org')
 cern=jpype.JPackage('cern')
 java=jpype.java
 System=java.lang.System
+
+
+import pytimber
+
+nxcals=pytimber.NXCals()
+
+
+nxcals.searchVariable("SPS%")
+
+
