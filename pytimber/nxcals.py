@@ -13,7 +13,47 @@ certs = os.path.join(nxcals_home,'nxcals_cacerts')
 username=getpass.getuser()
 
 
+def schema2dtype(schema):
+    dtype=[]
+    for field in schema.fields():
+        ftype=field.dataType().toString()
+        fname=field.name()
+        if ftype=="StringType":
+            dtype.append( ( fname, 'U200'))
+        elif ftype=="DoubleType":
+            dtype.append( ( fname, 'float64'))
+        elif ftype=="LongType":
+            dtype.append( ( fname, 'int64'))
+        elif ftype=="BooleanType":
+            dtype.append( ( fname, 'bool'))
+        else :
+            print(fname,ftype)
+            dtype.append( ( fname, 'object'))
+    return np.dtype(dtype)
+
 class NXCals(object):
+
+    @staticmethod
+    def rows2array(rows):
+        dtype=schema2dtype(rows[0].schema())
+        print(dtype)
+        return np.fromiter(  (tuple(row.values()) for row in rows),
+            dtype=dtype,
+            count=len(rows)
+            )
+
+    @staticmethod
+    def rows2pandas(rows):
+        import pandas as pd
+        names=list(rows[0].schema().names())
+        data=(row.values() for row in rows)
+        df=pd.DataFrame.from_records(data,columns=names,nrows=len(rows))
+        for idx in 'nxcals_timestamp','timestamp','acqStamp':
+            if idx in names:
+                df.set_index(idx)
+            break
+        return df
+
     @staticmethod
     def create_certs():
         print(f"Creating {certs}")
@@ -163,6 +203,7 @@ klist
             else :
                 val=self._SparkDataFrameConversions.extractColumn(data,"nxcals_value")
             return  np.array(ts[:]/1e9,dtype=float),np.array(val[:])
+
 
 
     def searchEntity(self,pattern):

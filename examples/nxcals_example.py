@@ -13,22 +13,60 @@ t2='2018-05-23 00:06:54.500'
 
 ts,val= nxcals.getVariable('LHC.BCTFR.A6R4.B1:BEAM_INTENSITY',t1,t2)
 
-### Spark object
 
+### Spark rows lowlevel access
+
+t1='2018-05-23 00:05:54.500'
+t2='2018-05-23 00:06:54.500'
 
 ds= nxcals.getVariable('LHC.BCTFR.A6R4.B1:BEAM_INTENSITY',t1,t2,output='spark')
-rows=ds.select('nxcals_timestamp','nxcals_value').sort('nxcals_timestamp')
-ts,val1=list(zip(*[(row.get(0)/1000.,row.get(1)) for row in rows.collect()]))
+rows=ds.select('nxcals_timestamp','nxcals_value').na().drop().sort('nxcals_timestamp').collect()
+ts,val1=list(zip(*[(row.get(0)/1000.,row.get(1)) for row in rows]))
+
+arr= nxcals.rows2array(rows)
+pd= nxcals.rows2pandas(rows)
+
+### Spark rows lowlevel access
+
+df = nxcals.DataQuery.byEntities().system('WINCCOA')\
+    .startTime('2018-06-15 00:00:00.000').endTime('2018-06-15 12:00:00.000')\
+    .entity().keyValue('variable_name', 'MB.C16L2:U_HDS_3')\
+    .buildDataset()
+
+rows=df1.collect()
+arr= nxcals.rows2array(rows)
+pd= nxcals.rows2pandas(rows)
+
+df = nxcals.DataQuery.byEntities().system('CMW')\
+    .startTime('2018-04-29 00:00:00.000').endTime('2018-04-30 00:00:00.000')\
+    .entity().keyValue('device', 'LHC.LUMISCAN.DATA').keyValue('property', 'CrossingAngleIP1')\
+    .buildDataset()
+
+rows=df.collect()
+arr= nxcals.rows2array(rows)
+pd= nxcals.rows2pandas(rows)
+
+df = nxcals.DataQuery.byEntities().system('CMW')\
+    .startTime('2018-04-29 00:00:00.000').endTime('2018-04-30 00:00:00.000')\
+    .entity().keyValue('device', 'LHC.LUMISCAN.DATA').keyValueLike('property', 'CrossingAngleIP%')\
+    .buildDataset()
+
+rows=df.collect()
+arr= nxcals.rows2array(rows)
+pd= nxcals.rows2pandas(rows)
 
 
 #basic query
-dataset=nxcals.DevicePropertyQuery.system('CMW')\
+dataset=nxcals.DataQuery.byEntities().system('CMW')\
         .startTime('2018-05-23 00:05:54.500').endTime('2018-05-23 00:06:54.500')\
-        .entity().device('ZT10.QFO03').property('Acquisition').buildDataset()
+        .entity().keyValue('device','ZT10.QFO03').keyValue('property','Acquisition').buildDataset()
 
 dataset.printSchema()
 
-data=dataset.select('cyclestamp', 'current').orderBy('cyclestamp', ascending=False).collect()
+rows=dataset.select('cyclestamp', 'current').orderBy('cyclestamp', ascending=False).collect()
+rows=dataset.orderBy('cyclestamp', ascending=False).collect()
+pd= nxcals.rows2pandas(rows)
+
 
 for row in data:
     print(list(row.values()))
