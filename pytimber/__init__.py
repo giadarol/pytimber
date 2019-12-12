@@ -20,6 +20,7 @@ from .pagestore import PageStore
 
 from .nxcals import NXCals
 
+
 __version__ = "2.9.0"
 
 __cmmnbuild_deps__ = [
@@ -47,3 +48,8 @@ __all__ = [
     "timberdata",
     "PageStore",
 ]
+
+# workaround for missing keyword
+# see (https://github.com/jpype-project/jpype/issues/540) to be fixed in new version
+import jpype
+jpype._pykeywords.KEYWORDS.add('and')

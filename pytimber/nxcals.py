@@ -1,6 +1,7 @@
 import os
 import getpass
 import logging
+import six
 
 import numpy as np
 
@@ -60,25 +61,24 @@ class NXCals(object):
         import urllib.request
         url="https://cafiles.cern.ch/cafiles/certificates/CERN%20Grid%20Certification%20Authority.crt"
         urllib.request.urlretrieve(url,filename="tmpcert")
-        cmd=f"keytool -import -alias cerngridcertificationauthority -file tmpcert -keystore nxcals_cacerts -storepass nxcals -noprompt"
+        cmd=f"keytool -import -alias cerngridcertificationauthority -file tmpcert -keystore {certs} -storepass nxcals -noprompt"
         print(cmd)
         os.system(cmd)
-        os.rename("nxcals_cacerts",certs)
         os.unlink("tmpcert")
+
     def create_keytab():
         if not os.path.isdir(nxcals_home):
             os.mkdir(nxcals_home)
-        print(f"""Please use:
-        ktutil
-
+        print(f"""Please use `kutil` to create a keytab using the following instruction
+ktutil\n
 ktutil: add_entry -password -p {username}@CERN.CH -k 1 -e arcfour-hmac-md5
 ktutil: wkt {keytab}
-ktutil: exit
+ktutil: exit\n
 kdestroy && kinit -f -r 5d -kt {keytab} {username}
 klist
         """)
 
-    def __init__(self,user=username,keytab=keytab,certs=certs,loglevel=logging.WARNING):
+    def __init__(self,user=username,keytab=keytab,certs=certs,loglevel=logging.ERROR):
         """
         Needs
            user: default user name
@@ -93,6 +93,8 @@ klist
             self._log.setLevel(loglevel)
 
         # Setup keytab and certs
+        self._keytab=None
+
         if os.path.isfile(keytab):
             self._keytab=keytab
         else:
@@ -100,7 +102,9 @@ klist
                 NXCals.create_keytab()
             except Exception as ex:
                 print(ex)
-                raise ValueError(f"Keytab file {keytab} does not exists")
+                raise ValueError(f"Keytab file {keytab} could not be created")
+
+        self._certs=None
         if os.path.isfile(certs):
             self._certs=certs
         else:
@@ -108,7 +112,7 @@ klist
                 NXCals.create_certs()
             except Exception as ex:
                 print(ex)
-                raise ValueError(f"Certificate file {certs} does not exists")
+                raise ValueError(f"Certificate file {certs} could not be created")
 
         self._user=user
 
@@ -129,23 +133,23 @@ klist
             print(ex.stacktrace())
             raise ex
 
-        # nxcals config
+        # nxcals shortcuts
         self._builders=self._cern.nxcals.api.extraction.data.builders
-        #self.builders.FluentQuery
-        #self.builders.KeyValuesQuery
-        #self.builders.QueryData
-        #self.builders.VariableQuery
-
+        self._Variables=self._cern.nxcals.api.extraction.metadata.queries.Variables
         self._ServiceClientFactory=self._cern.nxcals.api.extraction.metadata.ServiceClientFactory
 
-        self._variableService=self._ServiceClientFactory.createVariableService()
-        self._entityService=self._ServiceClientFactory.createEntityService()
-        #self._systemService=self._ServiceClientFactory.createSystemService()
-
-        self._Variables=self._cern.nxcals.api.extraction.metadata.queries.Variables
-
-        # Java helpers
+        # pytimber helpers
         self._SparkDataFrameConversions=self._org.pytimber.utils.SparkDataFrameConversions
+
+        # nxcals services
+        try:
+           self._variableService=self._ServiceClientFactory.createVariableService()
+           self._entityService=self._ServiceClientFactory.createEntityService()
+        except TypeError:
+            print("Possible problems with kerberos. Checking with keylist")
+            os.system("klist")
+
+        #self._systemService=self._ServiceClientFactory.createSystemService()
 
 
 
@@ -163,10 +167,13 @@ klist
 
     def _get_spark(self):
         self._System.setProperty("spring.main.web-application-type", "none")
-        self._System.setProperty("javax.net.ssl.trustStore", self._certs)
-        self._System.setProperty("javax.net.ssl.trustStorePassword", "nxcals")
-        self._System.setProperty("kerberos.keytab", self._keytab)
+        if self._certs is not None:
+           self._System.setProperty("javax.net.ssl.trustStore", self._certs)
+           self._System.setProperty("javax.net.ssl.trustStorePassword", "nxcals")
         self._System.setProperty("kerberos.principal", self._user)
+        if self._keytab is not None:
+           self._System.setProperty("kerberos.keytab", self._keytab)
+
         self._System.setProperty("service.url", "https://cs-ccr-nxcals6.cern.ch:19093,https://cs-ccr-nxcals7.cern.ch:19093,https://cs-ccr-nxcals8.cern.ch:19093")
 
         self._NxcalsSparkSession=self._org.pytimber.utils.NxcalsSparkSession
@@ -182,6 +189,22 @@ klist
     @property
     def DataQuery(self):
         return self._builders.DataQuery.builder(self.spark)
+
+    def  getVariablesList(self, pattern_or_list, system="CMW"):
+        if isinstance(pattern_or_list, six.string_types):
+            return self.searchVariable(pattern_or_list, system=system)
+        elif isinstance(pattern_or_list, (list, tuple)):
+            return pattern_or_list
+        else:
+            return None
+
+
+    def get(self,pattern_or_list,t1,t2,system="CMW",output='data'):
+        variables=self.getVariablesList( pattern_or_list, system=system)
+        out={}
+        for variable in variables:
+            out[variable]=self.getVariable(variable,t1,t2,system=system,output=output)
+        return out
 
     def getVariable(self,variable,t1,t2,system="CMW",output='data'):
         ds=self.DataQuery.byVariables().system(system)\

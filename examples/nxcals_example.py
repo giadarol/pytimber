@@ -33,7 +33,7 @@ df = nxcals.DataQuery.byEntities().system('WINCCOA')\
     .entity().keyValue('variable_name', 'MB.C16L2:U_HDS_3')\
     .buildDataset()
 
-rows=df1.collect()
+rows=df.collect()
 arr= nxcals.rows2array(rows)
 pd= nxcals.rows2pandas(rows)
 
