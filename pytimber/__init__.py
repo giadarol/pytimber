@@ -27,6 +27,7 @@ __cmmnbuild_deps__ = [
     "accsoft-cals-extr-client",
     "accsoft-cals-extr-domain",
 #    "lhc-commons-cals-utils",
+    "nxcals-backport-api",
     "pytimber-utils",
     "slf4j-log4j12",
     "slf4j-api",
